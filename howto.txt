@@ -1,0 +1,73 @@
+Setup - Kubernetes Cluster using one manager and two modes
+
+######################### Stage 1: Installation of Docker ################################
+apt update
+apt install docker.io -y
+docker --version
+
+# Start Docker service
+systemctl start Docker
+systemctl enable docker
+
+######################### Stage 2: Installation of Kubernetes ############################
+
+sudo apt-get update && sudo apt-get install -y apt-transport-https curl
+curl -s https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo apt-key add - 
+
+cat<<EOF | sudo tee /etc/apt/sources.list.d/kubernetes.list
+deb https://apt.kubernetes.io/ kubernetes-xenial main
+EOF
+
+# Install Kubelet and kubeadm
+sudo apt-get update
+sudo apt-get install -y kubelet kubeadm kubectl
+sudo apt-mark hold kubelet kubeadm kubectl
+
+# Create Master Machine
+(Use private ID for master machine)
+apt install net-tools
+ip addr
+var private_ip = result of "ip addr"
+
+kubeadm init --apiserver-advertise-address=10.162.0.2 --pod-network-cidr=192.168.0.0/16 --ignore-preflight-errors=all
+                                          ^private_ip of master machine  
+
+mkdir -p $HOME/.kube
+sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
+sudo chown $(id -u):$(id -g) $HOME/.kube/config
+
+# Use join command on all Node Servers
+kubeadm join private_ip --token (copy this from the result of the last command)
+kubeadm join 10.162.0.2:6443 --token aw1jjk.1qkxt31r2z319s92 \
+        --discovery-token-ca-cert-hash sha256:f0b20e433657ce62c34466b3eadb4085b4aaf97ab88a14c868b6d9bd827629d1
+
+sudo sed -i '/ swap / s/^/#/' /etc/fstab
+
+# Creating config file on Master machine
+mkdir -p $HOME/.kubeadm
+sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
+sudo chown $(id -u):$(id -g) $HOME/.kube/config
+
+# Adding plugin Calico - Master Server (use on nodes and master)
+
+kubectl apply -f https://docs.projectcalico.org/manifests/calico.yaml
+kubectl apply -f https://docs.projectcalico.org/v3.8/manifests/calico.yaml
+kubectl get nodes
+
+######################### Stage 3: Kubernetes Cluster Testing ############################
+# On master machine 
+kubectl get nodes
+kubectl get all
+
+# Clone code in master Server
+git clone https://github.com/amit873/Kubernetes-YAML.git
+# go to service folders
+cd Kubernetes-YAML/k8s/service/
+    nginx-deploy-nodeport.yaml
+    nginx-svc-nodeport.yaml
+
+kubectl create -f ngnix-deploy-nodeport.yaml
+kubectl create -f nginx-svc-nodeport.yaml
+kubectl get all
+
+# Testing - go on node ports 

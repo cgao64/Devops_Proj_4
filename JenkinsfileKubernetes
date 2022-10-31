@@ -1,0 +1,37 @@
+node{
+    stage('SCM Checkout') {
+        git branch: 'main', credentialsId: 'GIT_CREDENTIALS', url: 'https://github.com/amit873/Jenkins-Docker-Kubernetes-Project1.git'
+    }
+    
+    stage('Maven Clean Package') {
+      def mavenHome =  tool name: "Maven", type: "maven"
+      def mavenCMD = "${mavenHome}/bin/mvn"
+      sh "${mavenCMD} clean package"
+    }
+    
+    stage('Build Docker Image'){        
+        sh "docker build -t ameintu/jenkins-docker-k8s-project:${env.BUILD_ID} ."
+    }
+    
+    stage('Push Docker Image'){
+        withCredentials([string(credentialsId: 'DOCKER_HUB_CREDENTIALS', variable: 'DOCKER_HUB_CREDENTIALS')]) {
+            sh "docker login -u cgao64 -p ${DOCKER_HUB_CREDENTIALS}"
+        }
+        sh "docker push ameintu/jenkins-docker-k8s-project:${env.BUILD_ID}"
+    }
+    
+    stage("Deploy Application in K8S Cluster"){
+        kubernetesDeploy(
+         configs: 'springBootMongo.yml', 
+         kubeconfigId: 'KUBERNATES_CLUSTER_CONFIG',
+         enableConfigSubstitution: true
+        )
+    }
+    
+     /**
+     stage("Deploy To Kuberates Cluster"){
+     	sh "sed -i 's/tagversion/${env.BUILD_ID}/g' springBootMongo.yml"
+        sh 'kubectl apply -f springBootMongo.yml'
+     } **/
+	
+}
